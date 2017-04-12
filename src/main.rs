@@ -4,7 +4,6 @@ use std::env;
 use std::fmt;
 use std::io;
 use std::io::Write;
-use std::sync::Mutex;
 
 extern crate syn;
 use syn::*;
@@ -376,13 +375,13 @@ fn collect_deps(dst: &mut Vec<String>, results_ref: &ConversionResults, deps: &B
 fn main() {
     let p = env::args().nth(1).unwrap();
 
-    let results = Mutex::new(ConversionResults {
+    let mut results = ConversionResults {
         funcs: Vec::new(),
         ds: BTreeMap::new(),
         type_map: BTreeMap::new(),
-    });
+    };
 
-    rust_lib::parse(p, &|mod_name, items| {
+    rust_lib::parse(p, &mut |mod_name, items| {
         for item in items {
             match item.node {
                 ItemKind::Fn(ref decl,
@@ -406,7 +405,7 @@ fn main() {
                                         .collect::<Vec<_>>()
                                         .join(",\n    "),
                                     wr_func_body(&item.attrs));
-                        results.lock().unwrap().funcs.push(ConvertedItem::new(c_code, vec![], deps));
+                        results.funcs.push(ConvertedItem::new(c_code, vec![], deps));
                     }
                 }
                 ItemKind::Struct(ref variant,
@@ -434,7 +433,7 @@ fn main() {
                                                                f.ident.as_ref().unwrap()))
                                               .collect::<Vec<_>>()
                                               .join(" &&\n      "))));
-                            results.lock().unwrap().ds.insert(
+                            results.ds.insert(
                                 item.ident.to_string(),
                                 ConvertedItem::new(c_code, ty_params, deps));
                         }
@@ -448,7 +447,7 @@ fn main() {
                                              variants.iter()
                                                      .fold((String::new(), -1), fold_enum_variants)
                                                      .0);
-                        results.lock().unwrap().ds.insert(
+                        results.ds.insert(
                             item.ident.to_string(),
                             ConvertedItem::new(c_code, vec![], BTreeSet::new()));
                     }
@@ -457,7 +456,7 @@ fn main() {
                     let alias_name = item.ident.to_string();
                     let alias = TypeAlias::new(&alias_name, ty);
 
-                    results.lock().unwrap().type_map.insert(alias_name, alias);
+                    results.type_map.insert(alias_name, alias);
                 }
                 _ => {}
             }
@@ -473,7 +472,7 @@ fn main() {
     // Collect into a Vec to maintain dependency order - things that are depended
     // are always before the things that depend on them.
     let mut all_func_deps = Vec::new();
-    let results_ref = &results.lock().unwrap();
+    let results_ref = &results;
     for converted in &results_ref.funcs {
         collect_deps(&mut all_func_deps, results_ref, &converted.deps);
     }
