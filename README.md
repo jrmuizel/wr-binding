@@ -1,3 +1,7 @@
+# Obsolete 
+## wr-binding has become into https://github.com/rlhunt/cbindgen/ 
+
+
 This project can be used to generate C bindings for rust code. In particular it will be used for generating a C API for webrender.
 
 Steps to use:
